@@ -13,11 +13,15 @@ return new class extends Migration
     {
         Schema::create('signals', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->timestamp('signal_created_at');
+            $table->timestamp('created_at')->useCurrent();
             $table->unsignedInteger('ttl_ms');
+            $table->string('status');
+            $table->string('source');
             $table->json('constraints')->nullable();
-            $table->string('state')->default('PENDING');
-            $table->timestamps();
+            $table->decimal('expected_pnl', 24, 8)->nullable();
+
+            $table->index('status');
+            $table->index('source');
         });
     }
 

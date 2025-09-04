@@ -11,21 +11,36 @@ class Signal extends Model
 
     public $incrementing = false;
 
+    const UPDATED_AT = null;
+
     protected $fillable = [
         'id',
-        'signal_created_at',
+        'created_at',
         'ttl_ms',
+        'status',
+        'source',
         'constraints',
-        'state',
+        'expected_pnl',
     ];
 
     protected $casts = [
-        'signal_created_at' => 'datetime',
+        'created_at' => 'datetime',
         'constraints' => 'array',
+        'expected_pnl' => 'decimal:8',
     ];
 
     public function legs(): HasMany
     {
         return $this->hasMany(SignalLeg::class);
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(SignalEvent::class);
     }
 }
