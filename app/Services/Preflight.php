@@ -5,8 +5,8 @@ namespace App\Services;
 class Preflight
 {
     public function __construct(
-        private int $feeBps,
-        private int $slippageBps
+        private array $feeBps,
+        private array $slippageBps
     ) {}
 
     public function expectedNetPnl(array $legs, float $execQty): float
@@ -14,16 +14,18 @@ class Preflight
         $buyPrice = $legs['buy'];
         $sellPrice = $legs['sell'];
         $gross = ($sellPrice - $buyPrice) * $execQty;
-        $feeCost = ($buyPrice * $execQty + $sellPrice * $execQty) * $this->feeBps / 10000;
+        $feeCost = ($buyPrice * $execQty * ($this->feeBps['buy'] ?? 0) / 10000)
+            + ($sellPrice * $execQty * ($this->feeBps['sell'] ?? 0) / 10000);
         return $gross - $feeCost;
     }
 
     public function expectedNetPnlWithSlippage(array $legs, float $execQty): float
     {
-        $buyPrice = $legs['buy'] * (1 + $this->slippageBps / 10000);
-        $sellPrice = $legs['sell'] * (1 - $this->slippageBps / 10000);
+        $buyPrice = $legs['buy'] * (1 + ($this->slippageBps['buy'] ?? 0) / 10000);
+        $sellPrice = $legs['sell'] * (1 - ($this->slippageBps['sell'] ?? 0) / 10000);
         $gross = ($sellPrice - $buyPrice) * $execQty;
-        $feeCost = ($buyPrice * $execQty + $sellPrice * $execQty) * $this->feeBps / 10000;
+        $feeCost = ($buyPrice * $execQty * ($this->feeBps['buy'] ?? 0) / 10000)
+            + ($sellPrice * $execQty * ($this->feeBps['sell'] ?? 0) / 10000);
         return $gross - $feeCost;
     }
 

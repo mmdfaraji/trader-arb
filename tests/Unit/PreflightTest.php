@@ -9,7 +9,7 @@ class PreflightTest extends TestCase
 {
     public function test_expected_pnl_and_min_pnl_rejection(): void
     {
-        $service = new Preflight(feeBps: 10, slippageBps: 10);
+        $service = new Preflight(feeBps: ['buy' => 10, 'sell' => 10], slippageBps: ['buy' => 10, 'sell' => 10]);
         $legs = ['buy' => 1_000_000, 'sell' => 1_010_000];
         $execQty = 5119; // derived effective quantity
 
