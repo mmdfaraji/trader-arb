@@ -26,9 +26,11 @@ use App\Arbitrage\ExchangeAdapter;
  */
 class ArbitrageEngine
 {
+    /**
+     * @param array<string,ExchangeAdapter> $adapters
+     */
     public function __construct(
-        private ExchangeAdapter $legA,
-        private ExchangeAdapter $legB
+        private array $adapters
     ) {
     }
 
@@ -46,7 +48,7 @@ class ArbitrageEngine
         // ----- Phase C: send & monitor -----
         $orders = [];
         foreach ($signal['legs'] as $i => $leg) {
-            $adapter = $i === 0 ? $this->legA : $this->legB;
+            $adapter = $this->adapters[$leg['exchange']];
             $tif = $leg['tif'] ?? 'IOC';
             $qtyRounded = $this->roundQty($qty, $adapter);
             $orders[$i] = $adapter->placeOrder([
@@ -59,7 +61,7 @@ class ArbitrageEngine
         }
 
         foreach ($orders as $i => $order) {
-            $adapter = $i === 0 ? $this->legA : $this->legB;
+            $adapter = $this->adapters[$signal['legs'][$i]['exchange']];
             $orders[$i] = $this->pollOrder($adapter, $order['id']);
         }
 
@@ -69,7 +71,7 @@ class ArbitrageEngine
         if (abs($execA - $execB) > 0) {
             // hedge on exchange with lesser fill
             if ($execA > $execB) {
-                $adapter = $this->legB;
+                $adapter = $this->adapters[$signal['legs'][1]['exchange']];
                 $hedgeQty = $execA - $execB;
                 $adapter->placeOrder([
                     'symbol' => $signal['legs'][1]['symbol'],
@@ -79,7 +81,7 @@ class ArbitrageEngine
                     'tif' => 'IOC',
                 ]);
             } else {
-                $adapter = $this->legA;
+                $adapter = $this->adapters[$signal['legs'][0]['exchange']];
                 $hedgeQty = $execB - $execA;
                 $adapter->placeOrder([
                     'symbol' => $signal['legs'][0]['symbol'],
@@ -92,7 +94,7 @@ class ArbitrageEngine
         }
 
         // ----- Phase E: compute & finalize -----
-        $pnl = $this->computePnl($orders, [$this->legA, $this->legB], $signal['legs']);
+        $pnl = $this->computePnl($orders, $signal['legs']);
         if ($pnl < $minPnl) {
             return ['status' => 'REJECTED', 'pnl' => $pnl];
         }
@@ -141,14 +143,16 @@ class ArbitrageEngine
         return random_int(0, $exp);
     }
 
-    private function computePnl(array $orders, array $adapters, array $legs): float
+    private function computePnl(array $orders, array $legs): float
     {
         $qty = min($orders[0]['executed_qty'], $orders[1]['executed_qty']);
         $buy = $legs[0]['side'] === 'buy' ? 0 : 1;
         $sell = 1 - $buy;
         $buyPrice = $legs[$buy]['price'];
         $sellPrice = $legs[$sell]['price'];
-        $fees = ($adapters[$buy]->fees['taker'] + $adapters[$sell]->fees['taker']) / 10000;
+        $buyAdapter = $this->adapters[$legs[$buy]['exchange']];
+        $sellAdapter = $this->adapters[$legs[$sell]['exchange']];
+        $fees = ($buyAdapter->fees['taker'] + $sellAdapter->fees['taker']) / 10000;
         return ($sellPrice - $buyPrice) * $qty - $fees * $qty * ($buyPrice + $sellPrice);
     }
 }

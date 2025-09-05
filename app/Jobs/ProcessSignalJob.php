@@ -2,8 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Arbitrage\Adapters\MockBinanceAdapter;
-use App\Arbitrage\Adapters\MockCoinbaseAdapter;
+use App\Arbitrage\Adapters\ExchangeAdapterFactory;
 use App\Arbitrage\ArbitrageEngine;
 use App\Models\PairExchange;
 use App\Models\Signal;
@@ -63,7 +62,18 @@ class ProcessSignalJob implements ShouldQueue
             return;
         }
 
-        $engine = new ArbitrageEngine(new MockBinanceAdapter(), new MockCoinbaseAdapter());
+        $factory = new ExchangeAdapterFactory();
+        $adapters = [];
+        foreach ($signal->legs->pluck('exchange')->unique() as $exName) {
+            try {
+                $adapters[$exName] = $factory->make($exName);
+            } catch (\InvalidArgumentException $e) {
+                $signal->update(['status' => 'REJECTED']);
+                return;
+            }
+        }
+
+        $engine = new ArbitrageEngine($adapters);
         $payload = [
             'constraints' => $signal->constraints ?? [],
             'legs' => $signal->legs->map(fn($leg) => [
@@ -72,6 +82,7 @@ class ProcessSignalJob implements ShouldQueue
                 'price' => (float) $leg->price,
                 'qty' => (float) $leg->qty,
                 'tif' => $leg->time_in_force,
+                'exchange' => $leg->exchange,
             ])->toArray(),
         ];
         $report = $engine->run($payload);

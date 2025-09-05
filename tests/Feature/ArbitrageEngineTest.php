@@ -12,12 +12,12 @@ class ArbitrageEngineTest extends TestCase
     {
         $exA = new MockBinanceAdapter();
         $exB = new MockCoinbaseAdapter();
-        $engine = new ArbitrageEngine($exA, $exB);
+        $engine = new ArbitrageEngine(['exA' => $exA, 'exB' => $exB]);
 
         $signal = [
             'legs' => [
-                ['symbol' => 'BTCUSDT', 'side' => 'buy', 'qty' => 1, 'price' => 100.0, 'tif' => 'IOC'],
-                ['symbol' => 'BTCUSDT', 'side' => 'sell', 'qty' => 1, 'price' => 101.0, 'tif' => 'IOC'],
+                ['symbol' => 'BTCUSDT', 'side' => 'buy', 'qty' => 1, 'price' => 100.0, 'tif' => 'IOC', 'exchange' => 'exA'],
+                ['symbol' => 'BTCUSDT', 'side' => 'sell', 'qty' => 1, 'price' => 101.0, 'tif' => 'IOC', 'exchange' => 'exB'],
             ],
         ];
 
@@ -32,12 +32,12 @@ class ArbitrageEngineTest extends TestCase
         $exA = new MockBinanceAdapter();
         $exB = new MockCoinbaseAdapter();
         $exA->setScenario('BTCUSDT', ['action' => 'timeout']);
-        $engine = new ArbitrageEngine($exA, $exB);
+        $engine = new ArbitrageEngine(['exA' => $exA, 'exB' => $exB]);
 
         $signal = [
             'legs' => [
-                ['symbol' => 'BTCUSDT', 'side' => 'buy', 'qty' => 1, 'price' => 100.0],
-                ['symbol' => 'BTCUSDT', 'side' => 'sell', 'qty' => 1, 'price' => 101.0],
+                ['symbol' => 'BTCUSDT', 'side' => 'buy', 'qty' => 1, 'price' => 100.0, 'exchange' => 'exA'],
+                ['symbol' => 'BTCUSDT', 'side' => 'sell', 'qty' => 1, 'price' => 101.0, 'exchange' => 'exB'],
             ],
         ];
 
@@ -58,12 +58,12 @@ class ArbitrageEngineTest extends TestCase
         $exA = new MockBinanceAdapter();
         $exB = new MockCoinbaseAdapter();
         $exA->setScenario('BTCUSDT', ['action' => 'partial', 'qty' => 0.4]);
-        $engine = new ArbitrageEngine($exA, $exB);
+        $engine = new ArbitrageEngine(['exA' => $exA, 'exB' => $exB]);
 
         $signal = [
             'legs' => [
-                ['symbol' => 'BTCUSDT', 'side' => 'buy', 'qty' => 1, 'price' => 100.0],
-                ['symbol' => 'BTCUSDT', 'side' => 'sell', 'qty' => 1, 'price' => 101.0],
+                ['symbol' => 'BTCUSDT', 'side' => 'buy', 'qty' => 1, 'price' => 100.0, 'exchange' => 'exA'],
+                ['symbol' => 'BTCUSDT', 'side' => 'sell', 'qty' => 1, 'price' => 101.0, 'exchange' => 'exB'],
             ],
         ];
 
