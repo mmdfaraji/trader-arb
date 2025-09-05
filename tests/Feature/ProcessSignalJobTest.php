@@ -11,8 +11,9 @@ use App\Models\Exchange;
 use App\Models\Currency;
 use App\Models\Pair;
 use App\Models\PairExchange;
+use App\Jobs\ProcessSignalJob;
 
-class ProcessSignalsCommandTest extends TestCase
+class ProcessSignalJobTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -76,7 +77,7 @@ class ProcessSignalsCommandTest extends TestCase
             'time_in_force' => 'IOC',
         ]);
 
-        $this->artisan('signals:process')->assertExitCode(0);
+        ProcessSignalJob::dispatchSync($signal->id);
 
         $signal->refresh();
         $this->assertSame('FILLED', $signal->status);
