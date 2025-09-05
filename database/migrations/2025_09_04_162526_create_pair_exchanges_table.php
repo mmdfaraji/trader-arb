@@ -20,6 +20,7 @@ return new class extends Migration
             $table->decimal('pack_size', 24, 8)->nullable();
             $table->unsignedInteger('maker_fee_bps')->nullable();
             $table->unsignedInteger('taker_fee_bps')->nullable();
+            $table->unsignedInteger('slippage_bps')->nullable();
             $table->string('status');
 
             $table->unique(['exchange_id', 'pair_id']);

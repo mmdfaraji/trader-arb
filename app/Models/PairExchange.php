@@ -20,6 +20,7 @@ class PairExchange extends Model
         'pack_size',
         'maker_fee_bps',
         'taker_fee_bps',
+        'slippage_bps',
         'status',
     ];
 

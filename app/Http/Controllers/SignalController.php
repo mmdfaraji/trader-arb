@@ -40,10 +40,11 @@ class SignalController extends Controller
         DB::transaction(function () use ($data) {
             $signal = Signal::create([
                 'id' => $data['signal_id'],
-                'signal_created_at' => $data['created_at'],
+                'created_at' => $data['created_at'],
                 'ttl_ms' => $data['ttl_ms'],
                 'constraints' => $data['constraints'] ?? null,
-                'state' => 'PENDING',
+                'status' => 'PENDING',
+                'source' => 'api',
             ]);
 
             foreach ($data['legs'] as $leg) {
@@ -51,7 +52,7 @@ class SignalController extends Controller
                     'signal_id' => $signal->id,
                     'exchange' => $leg['Exchange'],
                     'market' => $leg['market'],
-                    'side' => $leg['Side'],
+                    'side' => strtolower($leg['Side']),
                     'price' => $leg['Price'],
                     'qty' => $leg['Qty'],
                     'time_in_force' => $leg['time_in_force'],

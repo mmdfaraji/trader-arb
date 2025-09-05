@@ -11,13 +11,12 @@ class SignalLeg extends Model
 
     protected $fillable = [
         'signal_id',
-        'exchange_id',
-        'pair_id',
+        'exchange',
+        'market',
         'side',
         'price',
         'qty',
-        'tif',
-        'desired_role',
+        'time_in_force',
     ];
 
     protected $casts = [
@@ -30,13 +29,5 @@ class SignalLeg extends Model
         return $this->belongsTo(Signal::class);
     }
 
-    public function exchange(): BelongsTo
-    {
-        return $this->belongsTo(Exchange::class);
-    }
-
-    public function pair(): BelongsTo
-    {
-        return $this->belongsTo(Pair::class);
-    }
+    // Relations to Exchange and Pair removed for simplified schema
 }
