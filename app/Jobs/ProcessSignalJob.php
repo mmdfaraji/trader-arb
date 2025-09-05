@@ -65,8 +65,10 @@ class ProcessSignalJob implements ShouldQueue
 
         $engine = new ArbitrageEngine(new MockBinanceAdapter(), new MockCoinbaseAdapter());
         $payload = [
+            'id' => $signal->id,
             'constraints' => $signal->constraints ?? [],
             'legs' => $signal->legs->map(fn($leg) => [
+                'exchange' => $leg->exchange,
                 'symbol' => $leg->market,
                 'side' => $leg->side,
                 'price' => (float) $leg->price,

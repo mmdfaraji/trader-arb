@@ -2,6 +2,9 @@
 namespace App\Arbitrage;
 
 use App\Arbitrage\ExchangeAdapter;
+use App\Jobs\MonitorOrderJob;
+use App\Arbitrage\Adapters\MockBinanceAdapter;
+use App\Arbitrage\Adapters\MockCoinbaseAdapter;
 
 /**
  * Coordinates the multi phase arbitrage flow.
@@ -58,11 +61,25 @@ class ArbitrageEngine
             ]);
         }
 
+        /*
         foreach ($orders as $i => $order) {
             $adapter = $i === 0 ? $this->legA : $this->legB;
             $orders[$i] = $this->pollOrder($adapter, $order['id']);
         }
+        */
+        foreach ($orders as $i => $order) {
+            $adapter = $i === 0 ? $this->legA : $this->legB;
+            $exchange = match (true) {
+                $adapter instanceof MockBinanceAdapter => 'binance',
+                $adapter instanceof MockCoinbaseAdapter => 'coinbase',
+                default => null,
+            };
+            if ($exchange) {
+                MonitorOrderJob::dispatch($exchange, $order['id'], $signal['id'] ?? '');
+            }
+        }
 
+        /*
         // ----- Phase D: partial/hedge -----
         $execA = $orders[0]['executed_qty'];
         $execB = $orders[1]['executed_qty'];
@@ -97,6 +114,9 @@ class ArbitrageEngine
             return ['status' => 'REJECTED', 'pnl' => $pnl];
         }
         return ['status' => 'FILLED', 'pnl' => $pnl];
+        */
+
+        return ['status' => 'PENDING', 'pnl' => 0];
     }
 
     /** qty_exec algorithm - min across balances, constraints, leg qty */
@@ -121,6 +141,8 @@ class ArbitrageEngine
 
     private function pollOrder(ExchangeAdapter $adapter, string $orderId): array
     {
+        // polling now handled asynchronously by MonitorOrderJob
+        /*
         $attempt = 0;
         $order = $adapter->getOrder($orderId);
         while (in_array($order['status'], ['NEW', 'PARTIALLY_FILLED'], true) && $attempt < 5) {
@@ -133,6 +155,8 @@ class ArbitrageEngine
             $order['status'] = 'CANCELED';
         }
         return $order;
+        */
+        return [];
     }
 
     private function backoff(int $attempt, int $base = 100, int $cap = 1000): int
