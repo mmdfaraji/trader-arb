@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Signal;
 use App\Models\SignalLeg;
+use App\Jobs\ProcessSignalJob;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -59,8 +60,8 @@ class SignalController extends Controller
                 ]);
             }
         });
-
         $signal = Signal::with('legs')->find($data['signal_id']);
+        ProcessSignalJob::dispatch($signal->id);
 
         return response()->json($signal, 201);
     }
