@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use InvalidArgumentException;
+
 class Preflight
 {
     public function __construct(
@@ -36,6 +38,46 @@ class Preflight
         return $pnlWithBuffers >= $minExpected;
     }
 
+
+    public function applyMarketConstraints(float $price, float $execQty, array $constraints): array
+    {
+        $qty = $this->roundQty(
+            $execQty,
+            $constraints['step_size'] ?? null,
+            $constraints['pack_size'] ?? null
+        );
+        $price = $this->roundPrice($price, $constraints['tick_size'] ?? null);
+
+        $notional = $price * $qty;
+        if (($constraints['min_notional'] ?? 0) > 0 && $notional < $constraints['min_notional']) {
+            throw new InvalidArgumentException('Order notional below minimum');
+        }
+
+        if (($constraints['max_order_size'] ?? 0) > 0 && $qty > $constraints['max_order_size']) {
+            throw new InvalidArgumentException('Order size exceeds maximum');
+        }
+
+        return ['price' => $price, 'qty' => $qty];
+    }
+
+    private function roundQty(float $qty, ?float $stepSize, ?float $packSize): float
+    {
+        if ($stepSize && $stepSize > 0) {
+            $qty = floor($qty / $stepSize) * $stepSize;
+        }
+        if ($packSize && $packSize > 0) {
+            $qty = floor($qty / $packSize) * $packSize;
+        }
+
+        return $qty;
+    }
+
+    private function roundPrice(float $price, ?float $tickSize): float
+    {
+        return ($tickSize && $tickSize > 0)
+            ? floor($price / $tickSize) * $tickSize
+            : $price;
+    }
     public function passesPortfolioCap(float $notional, float $cap): bool
     {
         if ($cap <= 0) {

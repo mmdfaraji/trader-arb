@@ -19,4 +19,41 @@ class PreflightTest extends TestCase
         $pnlAfter = $service->expectedNetPnlWithSlippage($legs, $execQty);
         $this->assertFalse($service->passesMinPnl($pnlAfter, 35_000_000));
     }
+
+    public function test_rounds_exec_qty_and_price(): void
+    {
+        $service = new Preflight(feeBps: [], slippageBps: []);
+        $result = $service->applyMarketConstraints(
+            price: 100.3,
+            execQty: 12.7,
+            constraints: ['tick_size' => 0.5, 'step_size' => 1, 'pack_size' => 5]
+        );
+
+        $this->assertEqualsWithDelta(100.0, $result['price'], 0.0000001);
+        $this->assertEqualsWithDelta(10, $result['qty'], 0.0000001);
+    }
+
+    public function test_min_notional_rejection(): void
+    {
+        $service = new Preflight(feeBps: [], slippageBps: []);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $service->applyMarketConstraints(
+            price: 100,
+            execQty: 4,
+            constraints: ['tick_size' => 1, 'step_size' => 1, 'min_notional' => 500]
+        );
+    }
+
+    public function test_max_order_size_rejection(): void
+    {
+        $service = new Preflight(feeBps: [], slippageBps: []);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $service->applyMarketConstraints(
+            price: 100,
+            execQty: 60,
+            constraints: ['tick_size' => 1, 'step_size' => 1, 'max_order_size' => 50]
+        );
+    }
 }
