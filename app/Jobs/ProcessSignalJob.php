@@ -17,32 +17,32 @@ class ProcessSignalJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public string $signalId)
-    {
-    }
+    public function __construct(public string $signalId) {}
 
     public function handle(): void
     {
         $signal = Signal::with('legs')->find($this->signalId);
-        if (!$signal || $signal->status !== 'PENDING') {
+        if (! $signal || $signal->status !== 'PENDING') {
             return;
         }
 
         $buyLeg = $signal->legs->firstWhere('side', 'buy');
         $sellLeg = $signal->legs->firstWhere('side', 'sell');
-        if (!$buyLeg || !$sellLeg) {
+        if (! $buyLeg || ! $sellLeg) {
             $signal->update(['status' => 'REJECTED']);
+
             return;
         }
 
-        $buyPx = PairExchange::whereHas('exchange', fn($q) => $q->where('name', $buyLeg->exchange))
-            ->whereHas('pair', fn($q) => $q->where('symbol', $buyLeg->market))
+        $buyPx = PairExchange::whereHas('exchange', fn ($q) => $q->where('name', $buyLeg->exchange))
+            ->whereHas('pair', fn ($q) => $q->where('symbol', $buyLeg->market))
             ->first();
-        $sellPx = PairExchange::whereHas('exchange', fn($q) => $q->where('name', $sellLeg->exchange))
-            ->whereHas('pair', fn($q) => $q->where('symbol', $sellLeg->market))
+        $sellPx = PairExchange::whereHas('exchange', fn ($q) => $q->where('name', $sellLeg->exchange))
+            ->whereHas('pair', fn ($q) => $q->where('symbol', $sellLeg->market))
             ->first();
-        if (!$buyPx || !$sellPx) {
+        if (! $buyPx || ! $sellPx) {
             $signal->update(['status' => 'REJECTED']);
+
             return;
         }
 
@@ -57,18 +57,59 @@ class ProcessSignalJob implements ShouldQueue
             'sell' => $sellLeg->price,
         ], $execQty);
         $min = $signal->constraints['Min_expected_pnl'] ?? 0;
-        if (!$preflight->passesMinPnl($pnl, $min)) {
+        if (! $preflight->passesMinPnl($pnl, $min)) {
             $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
             return;
         }
 
-        $factory = new ExchangeAdapterFactory();
+        $buyNotional = $buyLeg->price * $execQty;
+        $sellNotional = $sellLeg->price * $execQty;
+        $totalNotional = $buyNotional + $sellNotional;
+        $portfolioCap = $signal->constraints['Max_portfolio_notional'] ?? 0;
+        if (! $preflight->passesPortfolioCap($totalNotional, $portfolioCap)) {
+            $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
+            return;
+        }
+
+        $exchangeCaps = $signal->constraints['Exchange_notional_caps'] ?? [];
+        if (
+            ! $preflight->passesExchangeLimit($buyLeg->exchange, $buyNotional, $exchangeCaps) ||
+            ! $preflight->passesExchangeLimit($sellLeg->exchange, $sellNotional, $exchangeCaps)
+        ) {
+            $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
+            return;
+        }
+
+        $marketCaps = $signal->constraints['Market_notional_caps'] ?? [];
+        if (
+            ! $preflight->passesMarketLimit($buyLeg->market, $buyNotional, $marketCaps) ||
+            ! $preflight->passesMarketLimit($sellLeg->market, $sellNotional, $marketCaps)
+        ) {
+            $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
+            return;
+        }
+
+        $maxMovePct = $signal->constraints['Max_price_move_pct'] ?? 0;
+        $baseline = min($buyLeg->price, $sellLeg->price);
+        $recentMove = $baseline > 0 ? abs($sellLeg->price - $buyLeg->price) / $baseline * 100 : 0;
+        if (! $preflight->passesVolatilityGuard($recentMove, $maxMovePct)) {
+            $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
+            return;
+        }
+
+        $factory = new ExchangeAdapterFactory;
         $adapters = [];
         foreach ($signal->legs->pluck('exchange')->unique() as $exName) {
             try {
                 $adapters[$exName] = $factory->make($exName);
             } catch (\InvalidArgumentException $e) {
                 $signal->update(['status' => 'REJECTED']);
+
                 return;
             }
         }
@@ -76,7 +117,7 @@ class ProcessSignalJob implements ShouldQueue
         $engine = new ArbitrageEngine($adapters);
         $payload = [
             'constraints' => $signal->constraints ?? [],
-            'legs' => $signal->legs->map(fn($leg) => [
+            'legs' => $signal->legs->map(fn ($leg) => [
                 'symbol' => $leg->market,
                 'side' => $leg->side,
                 'price' => (float) $leg->price,

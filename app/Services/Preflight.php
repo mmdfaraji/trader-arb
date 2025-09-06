@@ -38,6 +38,7 @@ class Preflight
         return $pnlWithBuffers >= $minExpected;
     }
 
+
     public function applyMarketConstraints(float $price, float $execQty, array $constraints): array
     {
         $qty = $this->roundQty(
@@ -76,5 +77,48 @@ class Preflight
         return ($tickSize && $tickSize > 0)
             ? floor($price / $tickSize) * $tickSize
             : $price;
+    }
+    public function passesPortfolioCap(float $notional, float $cap): bool
+    {
+        if ($cap <= 0) {
+            return true;
+        }
+
+        return $notional <= $cap;
+    }
+
+    /**
+     * @param  array<string,float>  $caps  keyed by exchange name
+     */
+    public function passesExchangeLimit(string $exchange, float $notional, array $caps): bool
+    {
+        $cap = $caps[$exchange] ?? 0;
+        if ($cap <= 0) {
+            return true;
+        }
+
+        return $notional <= $cap;
+    }
+
+    /**
+     * @param  array<string,float>  $caps  keyed by market symbol
+     */
+    public function passesMarketLimit(string $market, float $notional, array $caps): bool
+    {
+        $cap = $caps[$market] ?? 0;
+        if ($cap <= 0) {
+            return true;
+        }
+
+        return $notional <= $cap;
+    }
+
+    public function passesVolatilityGuard(float $pctMove, float $threshold): bool
+    {
+        if ($threshold <= 0) {
+            return true;
+        }
+
+        return abs($pctMove) <= $threshold;
     }
 }
