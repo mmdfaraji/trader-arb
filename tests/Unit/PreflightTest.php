@@ -19,4 +19,17 @@ class PreflightTest extends TestCase
         $pnlAfter = $service->expectedNetPnlWithSlippage($legs, $execQty);
         $this->assertFalse($service->passesMinPnl($pnlAfter, 35_000_000));
     }
+
+    public function test_compute_executable_qty_considers_balances(): void
+    {
+        $service = new Preflight(feeBps: [], slippageBps: []);
+        $balances = ['buy' => 10_000_000_000, 'sell' => 6_000];
+        $reserved = ['buy' => 0, 'sell' => 1_000];
+        $legs = [
+            'buy' => ['side' => 'buy', 'price' => 1_000_000, 'qty' => 10_000],
+            'sell' => ['side' => 'sell', 'price' => 1_010_000, 'qty' => 10_000],
+        ];
+        $qty = $service->computeExecutableQty($balances, $reserved, $legs);
+        $this->assertSame(5000.0, $qty);
+    }
 }
