@@ -32,4 +32,38 @@ class PreflightTest extends TestCase
         $qty = $service->computeExecutableQty($balances, $reserved, $legs);
         $this->assertSame(5000.0, $qty);
     }
+
+    public function test_compute_executable_qty_rejects_when_min_notional_not_met(): void
+    {
+        $service = new Preflight(feeBps: [], slippageBps: []);
+        $balances = ['buy' => 5];
+        $reserved = ['buy' => 0];
+        $legs = [
+            'buy' => [
+                'side' => 'buy',
+                'price' => 1,
+                'qty' => 10_000,
+                'min_notional' => 10,
+            ],
+        ];
+        $qty = $service->computeExecutableQty($balances, $reserved, $legs);
+        $this->assertSame(0.0, $qty);
+    }
+
+    public function test_compute_executable_qty_respects_max_qty(): void
+    {
+        $service = new Preflight(feeBps: [], slippageBps: []);
+        $balances = ['sell' => 10_000];
+        $reserved = ['sell' => 0];
+        $legs = [
+            'sell' => [
+                'side' => 'sell',
+                'price' => 1,
+                'qty' => 10_000,
+                'max_qty' => 1_000,
+            ],
+        ];
+        $qty = $service->computeExecutableQty($balances, $reserved, $legs);
+        $this->assertSame(1_000.0, $qty);
+    }
 }
