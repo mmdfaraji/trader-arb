@@ -29,7 +29,7 @@ class PreflightTest extends TestCase
             constraints: ['tick_size' => 0.5, 'step_size' => 1, 'pack_size' => 5]
         );
 
-        $this->assertEqualsWithDelta(100.5, $result['price'], 0.0000001);
+        $this->assertEqualsWithDelta(100.0, $result['price'], 0.0000001);
         $this->assertEqualsWithDelta(10, $result['qty'], 0.0000001);
     }
 

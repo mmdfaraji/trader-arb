@@ -74,7 +74,7 @@ class Preflight
     private function roundPrice(float $price, ?float $tickSize): float
     {
         return ($tickSize && $tickSize > 0)
-            ? round($price / $tickSize) * $tickSize
+            ? floor($price / $tickSize) * $tickSize
             : $price;
     }
 }
