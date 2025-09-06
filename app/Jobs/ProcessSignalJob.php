@@ -102,6 +102,45 @@ class ProcessSignalJob implements ShouldQueue
             return;
         }
 
+        $buyNotional = $buyLeg->price * $execQty;
+        $sellNotional = $sellLeg->price * $execQty;
+        $totalNotional = $buyNotional + $sellNotional;
+        $portfolioCap = $signal->constraints['Max_portfolio_notional'] ?? 0;
+        if (! $preflight->passesPortfolioCap($totalNotional, $portfolioCap)) {
+            $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
+            return;
+        }
+
+        $exchangeCaps = $signal->constraints['Exchange_notional_caps'] ?? [];
+        if (
+            ! $preflight->passesExchangeLimit($buyLeg->exchange, $buyNotional, $exchangeCaps) ||
+            ! $preflight->passesExchangeLimit($sellLeg->exchange, $sellNotional, $exchangeCaps)
+        ) {
+            $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
+            return;
+        }
+
+        $marketCaps = $signal->constraints['Market_notional_caps'] ?? [];
+        if (
+            ! $preflight->passesMarketLimit($buyLeg->market, $buyNotional, $marketCaps) ||
+            ! $preflight->passesMarketLimit($sellLeg->market, $sellNotional, $marketCaps)
+        ) {
+            $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
+            return;
+        }
+
+        $maxMovePct = $signal->constraints['Max_price_move_pct'] ?? 0;
+        $baseline = min($buyLeg->price, $sellLeg->price);
+        $recentMove = $baseline > 0 ? abs($sellLeg->price - $buyLeg->price) / $baseline * 100 : 0;
+        if (! $preflight->passesVolatilityGuard($recentMove, $maxMovePct)) {
+            $signal->update(['status' => 'REJECTED', 'expected_pnl' => $pnl]);
+
+            return;
+        }
+
         $factory = new ExchangeAdapterFactory;
         $adapters = [];
         foreach ($signal->legs->pluck('exchange')->unique() as $exName) {

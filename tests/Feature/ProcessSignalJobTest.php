@@ -425,4 +425,84 @@ class ProcessSignalJobTest extends TestCase
             ['exB', 'exA', MockCoinbaseAdapter::class, MockBinanceAdapter::class],
         ];
     }
+
+    /**
+     * @dataProvider riskFailureConstraints
+     */
+    public function test_signal_rejected_when_risk_checks_fail(array $constraints): void
+    {
+        ExchangeAdapterFactory::reset();
+        $exA = Exchange::create(['name' => 'exA', 'api_url' => '', 'ws_url' => '', 'status' => 'ACTIVE']);
+        $exB = Exchange::create(['name' => 'exB', 'api_url' => '', 'ws_url' => '', 'status' => 'ACTIVE']);
+        $usdt = Currency::create(['symbol' => 'USDT', 'name' => 'Tether']);
+        $irr = Currency::create(['symbol' => 'IRR', 'name' => 'Rial']);
+        $pair = Pair::create(['base_currency_id' => $usdt->id, 'quote_currency_id' => $irr->id, 'symbol' => 'USDT/IRR']);
+        PairExchange::create([
+            'exchange_id' => $exA->id,
+            'pair_id' => $pair->id,
+            'exchange_symbol' => 'USDT/IRR',
+            'tick_size' => 1,
+            'step_size' => 1,
+            'min_notional' => 1,
+            'maker_fee_bps' => 5,
+            'taker_fee_bps' => 7,
+            'slippage_bps' => 1,
+            'status' => 'ACTIVE',
+        ]);
+        PairExchange::create([
+            'exchange_id' => $exB->id,
+            'pair_id' => $pair->id,
+            'exchange_symbol' => 'USDT/IRR',
+            'tick_size' => 1,
+            'step_size' => 1,
+            'min_notional' => 1,
+            'maker_fee_bps' => 6,
+            'taker_fee_bps' => 8,
+            'slippage_bps' => 2,
+            'status' => 'ACTIVE',
+        ]);
+
+        $signal = Signal::create([
+            'id' => (string) Str::uuid(),
+            'ttl_ms' => 5000,
+            'status' => 'PENDING',
+            'source' => 'api',
+            'constraints' => $constraints,
+        ]);
+
+        SignalLeg::create([
+            'signal_id' => $signal->id,
+            'exchange' => 'exA',
+            'market' => 'USDT/IRR',
+            'side' => 'buy',
+            'price' => 1000000,
+            'qty' => 10000,
+            'time_in_force' => 'IOC',
+        ]);
+
+        SignalLeg::create([
+            'signal_id' => $signal->id,
+            'exchange' => 'exB',
+            'market' => 'USDT/IRR',
+            'side' => 'sell',
+            'price' => 1010000,
+            'qty' => 10000,
+            'time_in_force' => 'IOC',
+        ]);
+
+        ProcessSignalJob::dispatchSync($signal->id);
+
+        $signal->refresh();
+        $this->assertSame('REJECTED', $signal->status);
+    }
+
+    public static function riskFailureConstraints(): array
+    {
+        return [
+            'portfolio' => [['Min_expected_pnl' => 0, 'Max_portfolio_notional' => 1]],
+            'exchange' => [['Min_expected_pnl' => 0, 'Max_portfolio_notional' => 1e12, 'Exchange_notional_caps' => ['exA' => 1]]],
+            'market' => [['Min_expected_pnl' => 0, 'Max_portfolio_notional' => 1e12, 'Market_notional_caps' => ['USDT/IRR' => 1]]],
+            'volatility' => [['Min_expected_pnl' => 0, 'Max_portfolio_notional' => 1e12, 'Max_price_move_pct' => 0.5]],
+        ];
+    }
 }
